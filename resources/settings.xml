@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<settings>
+  <category label="General">
+  	<setting id="autostart" type="bool" label="Autostart" default="true" />
+    <setting id="username" type="text" label="Username" default="" />
+    <setting id="password" type="text" option="hidden" label="Password" default="" />
+  </category>
+  <category label="Advanced (Only change if you know what you are doing)">
+  	<setting id="database" type="text" label="Video Database file" default="MyVideos44.db"/>
+    <setting id="debug" type="bool" label="Debug" default="false" />
+  </category>
+</settings>
