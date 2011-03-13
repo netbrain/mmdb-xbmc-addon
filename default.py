@@ -1,7 +1,6 @@
 """
 MyMediaDB XBMC Addon
 Licensed under GPL3
-Author: netbrain
 """
 
 # Import statements
@@ -36,21 +35,31 @@ def sleeper(millis):
         millis -= 1000
 
 def makeRequest(url):
+    global session_cookie
     request = urllib2.Request(url)
-    #debug('remote url='+url)
-    base64string = base64.encodestring('%s:%s' % (addon.getSetting('username'), addon.getSetting('password'))).replace('\n', '')
+    #debug('remote url='+url)    
+    if(session_cookie != None):
+        request.add_header("Cookie", session_cookie)
+        
+    base64string = base64.encodestring('%s:%s' % (addon.getSetting('username'), addon.getSetting('password'))).replace('\n', '')            
     request.add_header("Authorization", "Basic %s" % base64string)
     request.add_header("Content-Type","text/json")
     return request
 
 def openRequest(request):
+    global session_cookie
     opener = urllib2.build_opener()
+    response = None
     try:
-        return opener.open(request)
+        response = opener.open(request)
+        headers = response.info()
+        if('set-cookie' in headers):
+            session_cookie = headers['set-cookie']
+        print session_cookie
     except urllib2.URLError, e:
         if(e.code == 401):
             xbmc.executebuiltin('Notification(%s,%s,%s,%s)' % (addon.getAddonInfo('name'),e,3000,addon.getAddonInfo("icon")))
-    return None
+    return response
 
    
 def getRemoteMovieLibrary():
@@ -145,7 +154,7 @@ def syncWithMMDB():
         localMedia = getLocalMovie(remoteMedia['imdbId'])
         if (localMedia != None):
             debug('Media exists both locally and remotely - ('+remoteMedia['name']+')')
-            if(remoteMedia['acquired'] != True):
+            if not remoteMedia['acquired']:
                 setRemoteMovieTag(remoteMedia['imdbId'],{'acquired':True})
                 debug('Setting remote media status to acquired')
             if(remoteMedia['experienced'] != localMedia['watched']):
@@ -187,6 +196,10 @@ def syncWithMMDB():
 addon = xbmcaddon.Addon(id='script.mymediadb')
 apiurl = 'http://mymediadb.org/api/0.1'
 moviedb = xbmc.translatePath('special://database/%s' % addon.getSetting('database'))
+
+# Globals
+mmdb_library = []
+session_cookie = None
 
 # autoexecute addon on startup for older xbmc versions, remove this when xbmc.service goes live
 # Auto exec info
@@ -242,10 +255,6 @@ else:
         autoexecfile = file(AUTOEXEC_PATH, 'w')
         autoexecfile.write (AUTOEXEC_SCRIPT.strip())
         autoexecfile.close()
-
-
-# Globals (let's hope this is thread safe)
-mmdb_library = []
 
 # Print addon information
 print "[ADDON] '%s: version %s' initialized!" % (addon.getAddonInfo('name'), addon.getAddonInfo('version'))
