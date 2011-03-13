@@ -145,19 +145,30 @@ def syncWithMMDB():
         localMedia = getLocalMovie(remoteMedia['imdbId'])
         if (localMedia != None):
             debug('Media exists both locally and remotely - ('+remoteMedia['name']+')')
+            if(remoteMedia['acquired'] != True):
+                setRemoteMovieTag(remoteMedia['imdbId'],{'acquired':True})
+                debug('Setting remote media status to acquired')
             if(remoteMedia['experienced'] != localMedia['watched']):
                 debug('watched status is not synchronized')
-                if(remoteMedia['experienced']):
-                    debug('setting local media to watched')
-                    setLocalMovieAsWatched(localMedia['idFile'])
+                if(dontsyncwatched == False):
+                    if(remoteMedia['experienced']):
+                        debug('setting local media to watched')
+                        setLocalMovieAsWatched(localMedia['idFile'])
+                    else:
+                        debug ('setting remote media to watched')
+                        setRemoteMovieTag(localMedia['imdbId'],{'experienced':localMedia['watched'] == 1})
+                        anyRemoteChanges = True
                 else:
-                    debug ('setting remote media to watched')
-                    setRemoteMovieTag(localMedia['imdbId'],{'experienced':localMedia['watched'] == 1})
-                    anyRemoteChanges = True
+                    debug('Cancelled synchronize of watched status due to settings!')
         else:
             debug('Media ('+remoteMedia['name']+') exists only remotely')
-            setRemoteMovieTag(remoteMedia['imdbId'],{'acquired':False})
-            anyRemoteChanges = True
+            if(dontdeleteacquired == False):
+                if(remoteMedia['acquired'] == True):
+                    setRemoteMovieTag(remoteMedia['imdbId'],{'acquired':False})
+                    anyRemoteChanges = True
+                    debug('Acquired flag was removed from mmdb')
+            else:
+                debug('Acquired flag was not removed from mmdb due to settings!')
             
     #sync local media with remote db
     for localMedia in getLocalMovieLibrary():
@@ -189,6 +200,8 @@ if (os.path.exists(AUTOEXEC_PATH)):
     # Var to check if we're in autoexec.py
     found = False
     autostart = addon.getSetting('autostart') == 'true'
+    dontdeleteacquired = addon.getSetting('dontdeleteacquired') == 'true'
+    dontsyncwatched = addon.getSetting('dontsyncwatched') == 'true'
     autoexecfile = file(AUTOEXEC_PATH, 'r')
     filecontents = autoexecfile.readlines()
     autoexecfile.close()
@@ -242,7 +255,6 @@ xbmc.executebuiltin('Notification(%s,%s,%s,%s)' % (addon.getAddonInfo('name'),'i
 if(addon.getSetting('debug') == 'true'):
     print '---- '+addon.getAddonInfo('name')+'- DEBUG ----'
     print 'username=%s' % addon.getSetting('username')
-    print 'password=%s' % addon.getSetting('password')
     print 'moviedb=%s' % moviedb
     print '---- '+addon.getAddonInfo('name')+'- DEBUG ----'
 
