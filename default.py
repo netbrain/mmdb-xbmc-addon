@@ -55,7 +55,6 @@ def openRequest(request):
         headers = response.info()
         if('set-cookie' in headers):
             session_cookie = headers['set-cookie']
-        print session_cookie
     except urllib2.URLError, e:
         if(e.code == 401):
             xbmc.executebuiltin('Notification(%s,%s,%s,%s)' % (addon.getAddonInfo('name'),e,3000,addon.getAddonInfo("icon")))
