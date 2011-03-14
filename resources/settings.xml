@@ -11,5 +11,6 @@
   <category label="Advanced (Only change if you know what you are doing)">
   	<setting id="database" type="text" label="Video Database file" default="MyVideos44.db"/>
     <setting id="debug" type="bool" label="Debug" default="false" />
+    <setting id="testmode" type="bool" label="Testmode" default="false" />
   </category>
 </settings>
