@@ -14,6 +14,7 @@ import base64
 import re
 import thread
 import simplejson as json
+from mymediadb.mmdb import *
 
 try:
     from sqlite3 import dbapi2 as sqlite
@@ -34,74 +35,7 @@ def sleeper(millis):
     while (not xbmc.abortRequested and millis > 0):
         xbmc.sleep(1000)
         millis -= 1000
-
-def makeRequest(url):
-    global session_cookie
-    request = urllib2.Request(url)
-    #debug('remote url='+url)    
-    if(session_cookie != None):
-        request.add_header("Cookie", session_cookie)
-        
-    base64string = base64.encodestring('%s:%s' % (addon.getSetting('username'), addon.getSetting('password'))).replace('\n', '')            
-    request.add_header("Authorization", "Basic %s" % base64string)
-    request.add_header("Content-Type","text/json")
-    return request
-
-def openRequest(request):
-    global session_cookie
-    opener = urllib2.build_opener()
-    response = None
-    try:
-        response = opener.open(request)
-        headers = response.info()
-        if('set-cookie' in headers):
-            session_cookie = headers['set-cookie']
-    except urllib2.URLError, e:
-        if(e.code == 401):
-            xbmc.executebuiltin('Notification(%s,%s,%s,%s)' % (addon.getAddonInfo('name'),e,3000,addon.getAddonInfo("icon")))
-    return response
-
-   
-def getRemoteMovieLibrary():
-    request = makeRequest(apiurl+'/user')
-    f = openRequest(request)
-    if(f == None):
-        return None
-    library = json.load(f)['mediaLibrary']
-    for i, media in enumerate(library):
-        #=======================================================================
-        # debug("MEDIA")
-        # debug(media)
-        #=======================================================================
-        tags = getRemoteMovieTags(media['mediaId'])
-        #=======================================================================
-        # debug("TAGS")
-        # debug(tags)
-        #=======================================================================
-        library[i].update(tags)
-    return library
-
-def getRemoteMovieTags(mediaId):
-    request = makeRequest(apiurl+'/userMedia?mediaType=movie&idType=mmdb&id=%s' % mediaId)
-    f = openRequest(request)
-    if(f != None):
-        return json.load(f)
-    return None
-
-def setRemoteMovieTag(imdbId,postdata):
-    if(addon.getSetting('testmode') == 'false'):
-        setUpdatedMovies(imdbId)
-        debug('Setter movietag')
-        debug(postdata)
-        request = makeRequest(apiurl+'/userMedia?mediaType=movie&idType=imdb&id=%s' % imdbId)
-        request.add_data(json.dumps(postdata))
-        request.get_method = lambda: 'PUT'
-        f = openRequest(request)
-        if(f != None):
-            json.load(f)
-    else:
-        debug('MMDB Testmode cancelled API request "setRemoteMovieTag"')
-        
+       
 
 def getLocalMovieLibrary():
     result = []
@@ -174,6 +108,7 @@ def movieUpdatedNotifications():
 def syncWithMMDB():
     #define global access
     global mmdb_library
+    global mmdb
 
       #sync remote media with local db
     if(mmdb_library == None):
@@ -186,7 +121,7 @@ def syncWithMMDB():
             debug('Media exists both locally and remotely - ('+remoteMedia['name']+')')
             if not remoteMedia['acquired']:
                 debug('Setting remote media status to acquired')
-                setRemoteMovieTag(remoteMedia['imdbId'],{'acquired':True})
+                mmdb.setRemoteMovieTag(remoteMedia['imdbId'],{'acquired':True})
                 anyRemoteChanges = True
             if(remoteMedia['experienced'] != localMedia['watched']):
                 debug('watched status is not synchronized')
@@ -196,7 +131,7 @@ def syncWithMMDB():
                         setLocalMovieAsWatched(localMedia['idFile'])
                     else:
                         debug ('setting remote media to watched')
-                        setRemoteMovieTag(localMedia['imdbId'],{'experienced':localMedia['watched'] == 1})
+                        mmdb.setRemoteMovieTag(localMedia['imdbId'],{'experienced':localMedia['watched'] == 1})
                         anyRemoteChanges = True
                 else:
                     debug('Cancelled synchronize of watched status due to settings!')
@@ -205,7 +140,7 @@ def syncWithMMDB():
             if(remoteMedia['acquired'] == True):
                 if(addon.getSetting('dontdeleteacquired') == 'false'):
                     debug('Acquired flag was removed from mmdb')
-                    setRemoteMovieTag(remoteMedia['imdbId'],{'acquired':False})
+                    mmdb.setRemoteMovieTag(remoteMedia['imdbId'],{'acquired':False})
                     anyRemoteChanges = True
                 else:
                     debug('Acquired flag was not removed from mmdb due to settings!')
@@ -215,25 +150,24 @@ def syncWithMMDB():
         if(remoteMovieExists(localMedia['imdbId'])):
             continue
         debug('Media exists only locally - ('+localMedia['name']+')')
-        setRemoteMovieTag(localMedia['imdbId'],{'acquired': True, 'experienced':localMedia['watched'] == 1})
+        mmdb.setRemoteMovieTag(localMedia['imdbId'],{'acquired': True, 'experienced':localMedia['watched'] == 1})
         anyRemoteChanges = True
     if(anyRemoteChanges):
         debug('--- SYNCED WITH MMDB ---')
-        mmdb_library = getRemoteMovieLibrary() #sync local copy with changes on remote
+        mmdb_library = mmdb.getRemoteMovieLibrary() #sync local copy with changes on remote
         debug(mmdb_library)
     else:
         debug('--- NO CHANGES DETECTED ---')
 
 # Constants
 addon = xbmcaddon.Addon(id='script.mymediadb')
-
-apiurl = 'http://mymediadb.org/api/0.1'
+mmdb = MMDB(addon.getSetting('username'),addon.getSetting('password'))
 moviedb = xbmc.translatePath('special://database/%s' % addon.getSetting('database'))
 
 # Globals
 mmdb_library = []
-session_cookie = None
 updatedMovies = []
+
 # autoexecute addon on startup for older xbmc versions, remove this when xbmc.service goes live
 # Auto exec info
 AUTOEXEC_PATH = xbmc.translatePath( 'special://home/userdata/autoexec.py' )
@@ -312,7 +246,7 @@ if(addon.getSetting('dontsyncwatched') == 'true'):
     debug('Synching of wathched disabled')
 # Main logic
 debug('initial import of mmdb library')
-mmdb_library = getRemoteMovieLibrary() #initial fetch
+mmdb_library = mmdb.getRemoteMovieLibrary() #initial fetch
 #thread.start_new_thread(periodicallyGetRemoteLibrary,())    Removed because python error
 GRLCounter = 0
 
@@ -326,7 +260,7 @@ while (not xbmc.abortRequested):
     sleeper(300000) #5minutes
     GRLCounter += 1
     if(GRLCounter == 12): #60minutes
-        mmdb_library = getRemoteMovieLibrary()
+        mmdb_library = mmdb.getRemoteMovieLibrary()
         debug('Scheduled import of mmdb library')
         GRLCounter = 0
    
