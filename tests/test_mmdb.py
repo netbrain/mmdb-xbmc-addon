@@ -6,7 +6,7 @@
 
 import unittest
 
-from mymediadb.mmdb import *
+from mymediadb.mmdb import MMDB
 
 class UtilTest(unittest.TestCase):
 
