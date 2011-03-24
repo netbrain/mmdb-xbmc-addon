@@ -16,7 +16,7 @@
   <extension point="xbmc.addon.metadata">
     <platform>all</platform>
     <summary>Sync your media collection with MyMediaDB.org</summary>
-    <description>Sync your acquired and watched state of your videolibrary to and from MyMediaDB.org Share your entertainment endavours with your friends and family!</description>
+    <description>Sync your acquired and watched state of your videolibrary to and from MyMediaDB.org Share your entertainment endavours with your friends and family! Bugs can be reported at http://mmbd-xbmc-addon.googlecode.com</description>
     <disclaimer>An account at www.mymediadb.org is required!</disclaimer>
   </extension>
 </addon>
