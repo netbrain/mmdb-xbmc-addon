@@ -6,71 +6,11 @@ Licensed under GPL3
 # Import statements
 import sys
 import os
-import time
 import xbmc
-import xbmcaddon
 import urllib2
-import base64
-import re
-import thread
-import simplejson as json
-from mymediadb.mmdb import *
-
-try:
-    from sqlite3 import dbapi2 as sqlite
-    print "Loading sqlite3 as DB engine"
-except:
-    from pysqlite2 import dbapi2 as sqlite
-    print "Loading pysqlite2 as DB engine"
-
-# Functions
-def debug(txt):
-    if(addon.getSetting('debug') == 'true'):
-        try:
-            print txt
-        except:
-            print "Unexpected error:", sys.exc_info()[0]
-        
-def sleeper(millis):
-    while (not xbmc.abortRequested and millis > 0):
-        xbmc.sleep(1000)
-        millis -= 1000
-       
-
-def getLocalMovieLibrary():
-    result = []
-    connection = sqlite.connect(moviedb)
-    cursor = connection.cursor()
-    cursor.execute( "select distinct movie.idMovie,movie.idFile,movie.c09 as imdbId,movie.c00 as name, case when files.playCount > 0 then 1 else 0 end as watched from movie left join files on (movie.idFile = files.idFile)")    
-    for row in cursor:
-        result.append(createProperRowFromCursor(cursor,row))
-    connection.close()
-    return result
-
-def getLocalMovie(imdbId):
-    result = None
-    connection = sqlite.connect(moviedb)
-    cursor = connection.cursor()
-    cursor.execute( "select movie.idMovie,movie.idFile,movie.c09 as imdbId,movie.c00 as name, case when files.playCount > 0 then 1 else 0 end as watched from movie left join files on (movie.idFile = files.idFile) where imdbId=?",(imdbId,))    
-    result = createProperRowFromCursor(cursor,cursor.fetchone())
-    connection.close()
-    return result 
-
-def createProperRowFromCursor(cursor, row):
-    if(row == None):
-        return None
-    d = {}
-    for idx, col in enumerate(cursor.description):
-        d[col[0]] = row[idx]
-    return d
-
-
-def setUpdatedMovies(imdbId):
-    global updatedMovies
-    if imdbId == 'reset':
-        del updatedMovies[:]
-    else:
-        updatedMovies += [imdbId]
+from mymediadb.mmdb import MMDB
+from mymediadb.xbmcapp import XBMCApp
+from mymediadb.commonutils import debug,sleeper,addon
     
 def remoteMovieExists(imdbId):
     for remoteMedia in mmdb_library:
@@ -78,26 +18,13 @@ def remoteMovieExists(imdbId):
             return True
     return False
 
-def setLocalMovieAsWatched(idFile):
-    if(addon.getSetting('testmode') == 'false'):
-        connection = sqlite.connect(moviedb)
-        cursor = connection.cursor()
-        cursor.execute("update files SET playCount=1 where idFile=?",(idFile,))    
-        connection.commit()
-        connection.close()
-    else:
-        debug('MMDB Testmode cancelled API request "setLocalMovieAsWatched"')
-
 def movieUpdatedNotifications():
     if(addon.getSetting('shownotifications') == 'true'):
         moviesUpdatedCounter=0
         moviesUpdatedCounter= updatedMovies.__len__()
-        setUpdatedMovies('reset')
+        del updatedMovies[:]
         if(moviesUpdatedCounter > 0):
             xbmc.executebuiltin('Notification(%s,%s,%s,%s)' % (addon.getAddonInfo('name'),"%d movies updated on MMDB" % (moviesUpdatedCounter),7000,addon.getAddonInfo("icon")))
-        debug('Notifications should be showing now"')
-    else:
-        debug('Notifications is disabled"')
 
 #def periodicallyGetRemoteLibrary():
 #    while (not xbmc.abortRequested):
@@ -108,15 +35,15 @@ def movieUpdatedNotifications():
 def syncWithMMDB():
     #define global access
     global mmdb_library
-    global mmdb
 
-      #sync remote media with local db
+    #sync remote media with local db
     if(mmdb_library == None):
         debug("mmdb_library = None, is api down/changed?")
         return
     anyRemoteChanges = False
+    anyLocalChanges = False
     for remoteMedia in mmdb_library:
-        localMedia = getLocalMovie(remoteMedia['imdbId'])
+        localMedia = xbmcApp.getLocalMovie(remoteMedia['imdbId'])
         if (localMedia != None):
             debug('Media exists both locally and remotely - ('+remoteMedia['name']+')')
             if not remoteMedia['acquired']:
@@ -128,7 +55,8 @@ def syncWithMMDB():
                 if(addon.getSetting('dontsyncwatched') == 'false'):
                     if(remoteMedia['experienced']):
                         debug('setting local media to watched')
-                        setLocalMovieAsWatched(localMedia['idFile'])
+                        xbmcApp.setLocalMovieAsWatched(localMedia['idFile'])
+                        anyLocalChanges = True
                     else:
                         debug ('setting remote media to watched')
                         mmdb.setRemoteMovieTag(localMedia['imdbId'],{'experienced':localMedia['watched'] == 1})
@@ -146,23 +74,25 @@ def syncWithMMDB():
                     debug('Acquired flag was not removed from mmdb due to settings!')
             
     #sync local media with remote db
-    for localMedia in getLocalMovieLibrary():
+    for localMedia in xbmcApp.getLocalMovieLibrary():
         if(remoteMovieExists(localMedia['imdbId'])):
             continue
         debug('Media exists only locally - ('+localMedia['name']+')')
         mmdb.setRemoteMovieTag(localMedia['imdbId'],{'acquired': True, 'experienced':localMedia['watched'] == 1})
         anyRemoteChanges = True
+        
     if(anyRemoteChanges):
-        debug('--- SYNCED WITH MMDB ---')
+        debug('--- MADE REMOTE UPDATE(S) ---')
         mmdb_library = mmdb.getRemoteMovieLibrary() #sync local copy with changes on remote
         debug(mmdb_library)
+    elif(anyLocalChanges):
+        debug('--- MADE LOCAL CHANGE(S)  ---')
     else:
         debug('--- NO CHANGES DETECTED ---')
 
 # Constants
-addon = xbmcaddon.Addon(id='script.mymediadb')
 mmdb = MMDB(addon.getSetting('username'),addon.getSetting('password'))
-moviedb = xbmc.translatePath('special://database/%s' % addon.getSetting('database'))
+xbmcApp = XBMCApp(xbmc.translatePath('special://database/%s' % addon.getSetting('database')))
 
 # Globals
 mmdb_library = []
@@ -221,46 +151,37 @@ else:
         autoexecfile.write (AUTOEXEC_SCRIPT.strip())
         autoexecfile.close()
 
-# Print addon information
-print "[ADDON] '%s: version %s' initialized!" % (addon.getAddonInfo('name'), addon.getAddonInfo('version'))
-if(addon.getSetting('shownotifications') == 'true'):
-    xbmc.executebuiltin('Notification(%s,%s,%s,%s)' % (addon.getAddonInfo('name'),'is running!',3000,addon.getAddonInfo("icon")))
 
-# Print debug info
-if(addon.getSetting('debug') == 'true'):
-    print '---- '+addon.getAddonInfo('name')+'- DEBUG ----'
-    print 'username=%s' % addon.getSetting('username')
-    print 'moviedb=%s' % moviedb
-    print '---- '+addon.getAddonInfo('name')+'- DEBUG ----'
+try:
+    # Print addon information
+    print "[ADDON] '%s: version %s' initialized!" % (addon.getAddonInfo('name'), addon.getAddonInfo('version'))
+    if(addon.getSetting('shownotifications') == 'true'):
+        xbmc.executebuiltin('Notification(%s,%s,%s,%s)' % (addon.getAddonInfo('name'),'is running!',3000,addon.getAddonInfo("icon")))
+    
+    # Main logic
+    debug('initial import of mmdb library')
 
-# Testmode
-if(addon.getSetting('testmode') == 'true'):
-    debug('Testmode activated')
-
-# DontdeleteAqcuired
-if(addon.getSetting('dontdeleteacquired') == 'true'):
-    debug('Dont delete aqcuired activated')
-
-# Dontsyncwatched
-if(addon.getSetting('dontsyncwatched') == 'true'):
-    debug('Synching of wathched disabled')
-# Main logic
-debug('initial import of mmdb library')
-mmdb_library = mmdb.getRemoteMovieLibrary() #initial fetch
-#thread.start_new_thread(periodicallyGetRemoteLibrary,())    Removed because python error
-GRLCounter = 0
-
-
-
-while (not xbmc.abortRequested):
-    debug('Reinert START SYNC')
-    syncWithMMDB()
-    debug(updatedMovies)
-    movieUpdatedNotifications()
-    sleeper(300000) #5minutes
-    GRLCounter += 1
-    if(GRLCounter == 12): #60minutes
-        mmdb_library = mmdb.getRemoteMovieLibrary()
-        debug('Scheduled import of mmdb library')
-        GRLCounter = 0
-   
+    mmdb_library = mmdb.getRemoteMovieLibrary() #initial fetch    
+            
+    #thread.start_new_thread(periodicallyGetRemoteLibrary,())    Removed because python error
+    GRLCounter = 0
+    
+    while (not xbmc.abortRequested):
+        debug('Reinert START SYNC')
+        syncWithMMDB()
+        debug(updatedMovies)
+        movieUpdatedNotifications()
+        sleeper(300000) #5minutes
+        GRLCounter += 1
+        if(GRLCounter == 12): #60minutes
+            mmdb_library = mmdb.getRemoteMovieLibrary()
+            debug('Scheduled import of mmdb library')
+            GRLCounter = 0
+            
+except urllib2.URLError, e:
+    if(e.code == 401):
+        xbmc.executebuiltin('Notification(%s,%s,%s,%s)' % (addon.getAddonInfo('name'),e,3000,addon.getAddonInfo("icon")))
+except Exception:
+        xbmc.executebuiltin('Notification(%s,%s,%s,%s)' % (addon.getAddonInfo('name'),"An error occured.. check the logs! exiting!",3000,addon.getAddonInfo("icon")))
+        sleeper(5000)
+        sys.exit(1)
