@@ -18,5 +18,5 @@ test:
 	nosetests --with-xunit
 
 test-coverage:
-	nosetests --with-xunit --with-coverage --cover-inclusive mymediadb
+	nosetests --with-xunit --with-coverage --cover-inclusive mymediadb tests
 	coverage xml --omit="/usr/*","tests/*"
