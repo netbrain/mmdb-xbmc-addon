@@ -18,5 +18,5 @@ test:
 	nosetests --with-xunit
 
 test-coverage:
-	nosetests --with-xunit --with-coverage
+	nosetests --with-xunit --with-coverage --cover-inclusive
 	coverage xml --omit="/usr/*","tests/*"
