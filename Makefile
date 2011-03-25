@@ -15,7 +15,7 @@ clean:
 	-rm -f coverage.xml
 	-rm -f nosetests.xml
 test:
-	nosetests
+	nosetests --with-xunit
 
 test-coverage:
 	coverage xml --omit="/usr/*","tests/*"
