@@ -2,7 +2,7 @@ import urllib2
 import base64
 import simplejson as json
 
-class MMDB(): 
+class MMDB: 
     
     apiurl = 'http://mymediadb.org/api/0.1'
     session_cookie = None
