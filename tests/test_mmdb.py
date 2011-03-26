@@ -57,3 +57,4 @@ class MMDBApiTest(unittest.TestCase):
         except urllib2.URLError,e:
             self.assertEqual(e.code, 404, 'urlib2 url error')
                
+    

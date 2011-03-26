@@ -43,7 +43,6 @@ class MMDB:
 
     def __makeRequest(self,url):
         request = urllib2.Request(url)
-        debug('remote url='+url)    
         if(self.session_cookie != None):
             request.add_header("Cookie", self.session_cookie)
             
