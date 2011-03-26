@@ -19,7 +19,7 @@ class MMDB:
             return None
         library = json.load(f)['mediaLibrary']
         for i, media in enumerate(library):
-            tags = self.__getRemoteMovieTags(media['mediaId'])
+            tags = self._getRemoteMovieTags(media['mediaId'])
             library[i].update(tags)
         return library
     
@@ -34,7 +34,7 @@ class MMDB:
         else:
             debug('MMDB Testmode cancelled API request "setRemoteMovieTag"')
 
-    def __getRemoteMovieTags(self,mediaId):
+    def _getRemoteMovieTags(self,mediaId):
         request = self.__makeRequest(self.apiurl+'/userMedia?mediaType=movie&idType=mmdb&id=%s' % mediaId)
         f = self.__openRequest(request)
         if(f != None):
