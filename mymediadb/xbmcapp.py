@@ -22,6 +22,8 @@ class XBMCApp:
         return result
 
     def getLocalMovie(self,imdbId):
+        if imdbId == None:
+            raise RuntimeError("ImdbId cannot be None")
         connection = sqlite.connect(self.moviedb)
         cursor = connection.cursor()
         cursor.execute("select movie.idMovie,movie.idFile,movie.c09 as imdbId,movie.c00 as name, case when files.playCount > 0 then 1 else 0 end as watched from movie left join files on (movie.idFile = files.idFile) where imdbId=?",(imdbId,))    
@@ -33,9 +35,12 @@ class XBMCApp:
         if(addon.getSetting('testmode') == 'false'):
             connection = sqlite.connect(self.moviedb)
             cursor = connection.cursor()
-            cursor.execute("update files SET playCount=1 where idFile=?",(idFile,))    
+            cursor.execute("update files SET playCount=1 where idFile=?",(idFile,))  
             connection.commit()
+            totalChanges = connection.total_changes
             connection.close()
+            if totalChanges == 0:
+                raise RuntimeError('Expected 1 updated row, got 0')
     
     def __createProperRowFromCursor(self,cursor, row):
         if(row == None):
