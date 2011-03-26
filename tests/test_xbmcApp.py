@@ -12,7 +12,7 @@ from mymediadb.xbmcapp import XBMCApp
 class XBMCAppTest(unittest.TestCase):
     
     def setUp(self):        
-        moviedb = os.path.realpath(os.curdir+"/resources/test-database.db")
+        moviedb = os.path.dirname(os.path.abspath(__file__))+"/resources/test-database.db" 
         self.xbmcApp = XBMCApp(moviedb)
         
     def test_create_instance(self):
