@@ -18,4 +18,12 @@ class MMDBApiTest(unittest.TestCase):
         self.mmdb = MMDB(username,password)
         
     def test_create_instance(self):
-        self.assertNotEquals(self.mmdb,None)    
+        self.assertNotEquals(self.mmdb,None)
+    
+    def test_getRemoteLibrary(self):
+        library = self.mmdb.getRemoteMovieLibrary()
+        self.assertNotEquals(library,None,"Library should not be None")
+        self.assertTrue(library.__len__() > 0)
+        libraryKeys = library[0].keys()
+        for requiredKey in ['emotion','wishlisted','experienced','mediaId','name','acquired','imdbId','tmdbId']:
+            self.assertTrue(requiredKey in libraryKeys)
