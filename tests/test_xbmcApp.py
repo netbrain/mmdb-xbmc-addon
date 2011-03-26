@@ -41,8 +41,7 @@ class XBMCAppTest(unittest.TestCase):
         self.assertEqual(movie, None, 'Found movie when not supposed to,')
         
     def test_getLocalMovieWhereIdIsNone(self):
-        with self.assertRaises(RuntimeError):
-            self.xbmcApp.getLocalMovie(None)
+        self.assertRaises(RuntimeError, self.xbmcApp.getLocalMovie,None)
     
     def __setLocalMovieAsNotWatched(self,idFile):
         connection = sqlite.connect(self.xbmcApp.moviedb)
@@ -61,12 +60,9 @@ class XBMCAppTest(unittest.TestCase):
         self.__setLocalMovieAsNotWatched(movie['idFile'])
         
     def test_setLocalMovieAsWatchedWhereNonExists(self):
-        with self.assertRaises(RuntimeError):
-            self.xbmcApp.setLocalMovieAsWatched(5) #5 doesnt exists
+           self.assertRaises(RuntimeError,self.xbmcApp.setLocalMovieAsWatched,5) #5 doesnt exists
     
     def test_setLocalMovieAsWatchedWhereNone(self):
-        with self.assertRaises(RuntimeError):
-            self.xbmcApp.setLocalMovieAsWatched(None)
-        
+           self.assertRaises(RuntimeError,self.xbmcApp.setLocalMovieAsWatched,None) 
         
         
