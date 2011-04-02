@@ -33,12 +33,12 @@
 			    <arg value="--with-coverage"/>
 			    <arg value="--cover-inclusive"/>
 			    
-			    <arg value="mymediadb"/>
-			    <arg value="tests"/>			    
+			    <arg value="./mymediadb"/>
+			    <arg value="./tests"/>			    
 		</exec>
 		<exec executable="coverage">
 			    <arg value="xml"/>
-			    <arg value="--omit='/usr/*','tests/*'"/>		    
+			    <arg value="--omit=/usr/*,tests/*"/>		    
 		</exec>		
 	</target>	
 	
