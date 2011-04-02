@@ -1,0 +1,45 @@
+<project name="xbmc-mmdb-addon" default="build" basedir=".">
+  <!-- set global properties for this build -->
+  <property name="src" location="."/>
+  <property name="tests" location="tests"/>
+  <property name="target" location="target"/>
+
+  <target name="init">
+    <!-- Create the build directory structure used by compile -->
+    <mkdir dir="${target}"/>
+  </target>
+	
+  <target name="build" depends="clean,init" description="compile the source " >
+  	  <zip destfile="${target}/script.mymediadb.zip"
+       basedir="."
+       excludes="**/build.xml,**/tests/**,**/*.pyc,**/*.pyo,**/.*,**/.*/**,**/target/**"/>
+  </target>
+
+  <target name="clean" description="clean up" >
+    <delete dir="${target}"/>
+    <delete file="nosetests.xml"/>
+    <delete file="coverage.xml"/>
+  </target>
+
+	<target name="test" depends="clean" description="test" >
+		<exec executable="nosetests">
+			    <arg value="--with-xunit"/>
+		</exec>
+	</target>
+	
+	<target name="test-coverage" depends="clean" description="test with coverage" >
+		<exec executable="nosetests">
+			    <arg value="--with-xunit"/>
+			    <arg value="--with-coverage"/>
+			    <arg value="--cover-inclusive"/>
+			    
+			    <arg value="mymediadb"/>
+			    <arg value="tests"/>			    
+		</exec>
+		<exec executable="coverage">
+			    <arg value="xml"/>
+			    <arg value="--omit='/usr/*','tests/*'"/>		    
+		</exec>		
+	</target>	
+	
+</project>
