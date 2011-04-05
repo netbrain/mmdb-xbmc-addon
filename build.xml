@@ -12,7 +12,7 @@
   <target name="build" depends="clean,init" description="compile the source " >
   	  <zip destfile="${target}/script.mymediadb.zip"
        basedir="."
-       excludes="**/build.xml,**/tests/**,**/*.pyc,**/*.pyo,**/.*,**/.*/**,**/target/**"/>
+       excludes="**/build.xml,**/*.svn/**,**/tests/**,**/*.pyc,**/*.pyo,**/.*,**/.*/**,**/target/**"/>
   </target>
 
   <target name="clean" description="clean up" >
