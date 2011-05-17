@@ -6,6 +6,7 @@ Licensed under GPL3
 # Import statements
 import sys
 import os
+import re
 import xbmc
 import urllib2
 from mymediadb.mmdb import MMDB
@@ -38,9 +39,12 @@ def _setRemoteMovieTag(imdbId, postdata):
     
     try:
         if(imdbId not in recentlyFailedMovies):
-            mmdb.setRemoteMovieTag(imdbId,postdata) 
-            updatedMovies += [imdbId] ## adding to updated list
-            return True
+            if (imdbId is not None and len(imdbId) > 0 and re.match('tt[0-9]{6}',imdbId)):
+                mmdb.setRemoteMovieTag(imdbId,postdata) 
+                updatedMovies += [imdbId] ## adding to updated list
+                return True
+            else:
+                debug('MISSING OR WRONG IMDBID LOCALLY')
         else:
             debug('Movie was on failed list, and did not update')           
     except urllib2.URLError, e:
