@@ -27,11 +27,7 @@ def movieUpdatedNotifications():
         if(moviesUpdatedCounter > 0):
             xbmc.executebuiltin('Notification(%s,%s,%s,%s)' % (addon.getAddonInfo('name'),"%d movies updated on MMDB" % (moviesUpdatedCounter),7000,addon.getAddonInfo("icon")))
 
-#def periodicallyGetRemoteLibrary():
-#    while (not xbmc.abortRequested):
-#        sleeper(3600000) #1 hour
-#        debug('perodically import of remote library initiated')
-#        mmdb_library = getRemoteMovieLibrary()                 
+          
 
 def _setRemoteMovieTag(imdbId, postdata):
     global recentlyFailedMovies
@@ -44,13 +40,13 @@ def _setRemoteMovieTag(imdbId, postdata):
                 updatedMovies += [imdbId] ## adding to updated list
                 return True
             else:
-                debug('MISSING OR WRONG IMDBID LOCALLY')
+                debug('MISSING OR WRONG IMDBID LOCALLY ('+imdbId+').')
         else:
-            debug('Movie was on failed list, and did not update')           
+            debug('Movie was on failed list, and did not update ('+imdbId+').')           
     except urllib2.URLError, e:
         if(e.code == 404):
             recentlyFailedMovies += [imdbId] #Adding movie to failed movies list,  these will not be updated next sync
-            debug('Adding movie to failed list.')
+            debug('Adding movie to failed list ('+imdbId+').')
             return False
     
 def syncWithMMDB():
@@ -68,7 +64,7 @@ def syncWithMMDB():
             if (localMedia != None): 
                 debug('Media exists both locally and remotely - ('+remoteMedia['name']+')')
                 if not remoteMedia['acquired']:
-                    debug('Setting remote media status to acquired')
+                    debug('Setting remote media status to acquired ('+remoteMedia['name']+'['+localMedia['imdbId']+','+remoteMedia['imdbId']+']).')
                     _setRemoteMovieTag(remoteMedia['imdbId'],{'acquired':True})
                     anyRemoteChanges = True
                 if(remoteMedia['experienced'] != localMedia['watched']):
@@ -79,7 +75,7 @@ def syncWithMMDB():
                             xbmcApp.setLocalMovieAsWatched(localMedia['idFile'])
                             anyLocalChanges = True
                         else:
-                            debug ('setting remote media to watched')
+                            debug ('setting remote media to watched ('+remoteMedia['name']+'['+localMedia['imdbId']+','+remoteMedia['imdbId']+']).')
                             _setRemoteMovieTag(localMedia['imdbId'],{'experienced':localMedia['watched'] == 1})
                             anyRemoteChanges = True
                     else:
@@ -88,7 +84,7 @@ def syncWithMMDB():
                 debug('Media ('+remoteMedia['name']+') exists only remotely')
                 if(remoteMedia['acquired'] == True):
                     if(addon.getSetting('dontdeleteacquired') == 'false'):
-                        debug('Acquired flag was removed from mmdb')
+                        debug('Acquired flag was removed from mmdb ('+remoteMedia['name']+'['+remoteMedia['imdbId']+']).')
                         _setRemoteMovieTag(remoteMedia['imdbId'],{'acquired':False})
                         anyRemoteChanges = True
                     else:
@@ -188,10 +184,10 @@ try:
     debug('initial import of mmdb library')
     mmdb_library = mmdb.getRemoteMovieLibrary() #initial fetch    
             
-    #thread.start_new_thread(periodicallyGetRemoteLibrary,())    Removed because python error
     syncWithMmdbRunsCounter= 0
     
     while (not xbmc.abortRequested):
+        debug('Syncing local library with mmdb')
         syncWithMMDB()       
         sleeper(300000) #5minutes
         syncWithMmdbRunsCounter += 1
@@ -206,7 +202,6 @@ except urllib2.URLError, e:
         xbmc.executebuiltin('Notification(%s,%s,%s,%s)' % (addon.getAddonInfo('name'),e,3000,addon.getAddonInfo("icon")))
 except Exception, e:
         xbmc.executebuiltin('Notification(%s,%s,%s,%s)' % (addon.getAddonInfo('name'),'Error: %s' %e,5000,addon.getAddonInfo("icon")))
-        #xbmc.executebuiltin('Notification(%s,%s,%s,%s)' % (addon.getAddonInfo('name'),"An error occured.. check the logs! exiting!",3000,addon.getAddonInfo("icon")))
         debug(e)
         sleeper(5000)
         sys.exit(1)
