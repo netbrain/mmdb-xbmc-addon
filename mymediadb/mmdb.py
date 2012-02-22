@@ -48,13 +48,16 @@ class MMDB:
             
         base64string = base64.encodestring('%s:%s' % (self.username, self.password)).replace('\n', '')            
         request.add_header("Authorization", "Basic %s" % base64string)
-        request.add_header("Content-Type","text/json")
+        request.add_header("Accept","text/json")
         return request
     
     def __openRequest(self,request):
-        opener = urllib2.build_opener()
+	if(addon.getSetting('debug') == 'true'):
+            opener = urllib2.build_opener(urllib2.HTTPHandler(debuglevel=1))
+	else:
+	    opener = urllib2.build_opener()
         response = opener.open(request)
         headers = response.info()
         if('set-cookie' in headers):
             self.session_cookie = headers['set-cookie']
-        return response        
+        return response
