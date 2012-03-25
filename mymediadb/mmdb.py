@@ -48,7 +48,7 @@ class MMDB:
             
         base64string = base64.encodestring('%s:%s' % (self.username, self.password)).replace('\n', '')            
         request.add_header("Authorization", "Basic %s" % base64string)
-        request.add_header("Accept","text/json")
+        request.add_header("Content-Type","text/json")
         return request
     
     def __openRequest(self,request):

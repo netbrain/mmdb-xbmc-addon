@@ -15,8 +15,8 @@ import urllib2
 class MMDBApiTest(unittest.TestCase):
     
     def setUp(self):        
-        username = os.environ['python_test_mmdb_username']
-        password = os.environ['python_test_mmdb_password']
+        username = os.environ['mmdb.username']
+        password = os.environ['mmdb.password']
         self.mmdb = MMDB(username,password)
         
     def test_create_instance(self):
