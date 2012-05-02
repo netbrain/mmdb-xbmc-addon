@@ -20,7 +20,7 @@ except:
 class XBMCAppTest(unittest.TestCase):
     
     def setUp(self):        
-        moviedb = os.path.dirname(os.path.abspath(__file__))+"/resources/test-database.db" 
+        moviedb = os.path.dirname(os.path.abspath(__file__))+"/resources/test-database.db"
         self.xbmcApp = XBMCApp(moviedb)
         
     def test_create_instance(self):
@@ -53,16 +53,16 @@ class XBMCAppTest(unittest.TestCase):
     def test_setLocalMovieAsWatched(self):        
         movie = self.xbmcApp.getLocalMovie('tt0892769')
         self.assertEqual(movie['watched'], 0, 'Movie was set as watched Before test start')
-        self.xbmcApp.setLocalMovieAsWatched(movie['idFile'])
+        self.xbmcApp.setLocalFileAsWatched(movie['idFile'])
         movie = self.xbmcApp.getLocalMovie(movie['imdbId'])
         self.assertEqual(movie['watched'], 1, 'Movie was not set as watched')
         #Cleanup after test
         self.__setLocalMovieAsNotWatched(movie['idFile'])
         
     def test_setLocalMovieAsWatchedWhereNonExists(self):
-           self.assertRaises(RuntimeError,self.xbmcApp.setLocalMovieAsWatched,5) #5 doesnt exists
+           self.assertRaises(RuntimeError,self.xbmcApp.setLocalFileAsWatched,5) #5 doesnt exists
     
     def test_setLocalMovieAsWatchedWhereNone(self):
-           self.assertRaises(RuntimeError,self.xbmcApp.setLocalMovieAsWatched,None) 
+           self.assertRaises(RuntimeError,self.xbmcApp.setLocalFileAsWatched,None)
         
         

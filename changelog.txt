@@ -1,3 +1,6 @@
+[B]0.2.0[/B]
+- Now using API 0.2
+
 [B]0.1.5[/B]
 - Fixed issues with movies without imdbIDs
 - Made the errors notification tell you what kind of error you got.

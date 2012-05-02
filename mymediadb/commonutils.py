@@ -1,30 +1,28 @@
 class TestData:
     abortRequested = False
-    
+
     def getSetting(self,name):
         if name == 'debug':
             return 'true'
         elif name == 'testmode':
             return 'false'
         else:
-            raise RuntimeError    
-
-addon = None
+            raise RuntimeError
 
 try:
     import xbmcaddon
     addon = xbmcaddon.Addon(id='script.mymediadb')
 except:
     addon = TestData()
-    
+
 try:
     import xbmc
 except:
-    xbmc = TestData()  
-    
+    xbmc = TestData()
+
 
 def debug(txt):
-    if(addon.getSetting('debug') == 'true'):
+    if addon.getSetting('debug') == 'true':
         try:
             print txt
         except:

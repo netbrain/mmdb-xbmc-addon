@@ -5,176 +5,181 @@ Licensed under GPL3
 
 # Import statements
 import sys
-import os
 import re
 import xbmc
 import urllib2
 from mymediadb.mmdb import MMDB
 from mymediadb.xbmcapp import XBMCApp
 from mymediadb.commonutils import debug,sleeper,addon
-    
+
+#TAG CONSTANTS
+WATCHED = 'watched'
+ACQUIRED = 'acquired'
+
 def remoteMovieExists(imdbId):
     for remoteMedia in mmdb_library:
-        if(remoteMedia['imdbId'] == imdbId):
+        if remoteMedia['media']['imdbId'] == imdbId:
             return True
     return False
 
 def movieUpdatedNotifications():
     global updatedMovies
-    if(addon.getSetting('shownotifications') == 'true'):
+    if addon.getSetting('shownotifications') == 'true':
         moviesUpdatedCounter= updatedMovies.__len__()
         del updatedMovies[:]
-        if(moviesUpdatedCounter > 0):
+        if moviesUpdatedCounter > 0:
             xbmc.executebuiltin('Notification(%s,%s,%s,%s)' % (addon.getAddonInfo('name'),"%d movies updated on MMDB" % (moviesUpdatedCounter),7000,addon.getAddonInfo("icon")))
 
-          
+def getRemoteLibrary():
+    global mmdb_library
+    mmdb_library = []
+    mmdb_library.extend(mmdb.getRemoteMovieLibrary())
+    mmdb_library.extend(mmdb.getRemoteEpisodeLibrary())
 
-def _setRemoteMovieTag(imdbId, postdata):
-    global recentlyFailedMovies
-    global updatedMovies
-    
-    try:
-        if(imdbId not in recentlyFailedMovies):
-            if (imdbId is not None and len(imdbId) > 0 and re.match('tt[0-9]{6}',imdbId)):
-                mmdb.setRemoteMovieTag(imdbId,postdata) 
-                updatedMovies += [imdbId] ## adding to updated list
-                return True
-            else:
-                debug('MISSING OR WRONG IMDBID LOCALLY ('+imdbId+').')
-        else:
-            debug('Movie was on failed list, and did not update ('+imdbId+').')           
-    except urllib2.URLError, e:
-        if(e.code == 404):
-            recentlyFailedMovies += [imdbId] #Adding movie to failed movies list,  these will not be updated next sync
-            debug('Adding movie to failed list ('+imdbId+').')
-            return False
-    
 def syncWithMMDB():
     #define global access
     global mmdb_library
     #sync remote media with local db
-    if(mmdb_library == None):
+    if mmdb_library is None:
         debug("mmdb_library = None, is api down/changed?")
         return
     anyRemoteChanges = False
     anyLocalChanges = False
-    for remoteMedia in mmdb_library:
-        if(remoteMedia['imdbId']) != None:
-            localMedia = xbmcApp.getLocalMovie(remoteMedia['imdbId'])
-            if (localMedia != None): 
-                debug('Media exists both locally and remotely - ('+remoteMedia['name']+')')
-                if not remoteMedia['acquired']:
-                    debug('Setting remote media status to acquired ('+remoteMedia['name']+'['+localMedia['imdbId']+','+remoteMedia['imdbId']+']).')
-                    _setRemoteMovieTag(remoteMedia['imdbId'],{'acquired':True})
-                    anyRemoteChanges = True
-                if(remoteMedia['experienced'] != localMedia['watched']):
-                    debug('watched status is not synchronized')
-                    if(addon.getSetting('dontsyncwatched') == 'false'):
-                        if(remoteMedia['experienced']):
-                            debug('setting local media to watched')
-                            xbmcApp.setLocalMovieAsWatched(localMedia['idFile'])
-                            anyLocalChanges = True
-                        else:
-                            debug ('setting remote media to watched ('+remoteMedia['name']+'['+localMedia['imdbId']+','+remoteMedia['imdbId']+']).')
-                            _setRemoteMovieTag(localMedia['imdbId'],{'experienced':localMedia['watched'] == 1})
-                            anyRemoteChanges = True
-                    else:
-                        debug('Cancelled synchronize of watched status due to settings!')
-            else:
-                debug('Media ('+remoteMedia['name']+') exists only remotely')
-                if(remoteMedia['acquired'] == True):
-                    if(addon.getSetting('dontdeleteacquired') == 'false'):
-                        debug('Acquired flag was removed from mmdb ('+remoteMedia['name']+'['+remoteMedia['imdbId']+']).')
-                        _setRemoteMovieTag(remoteMedia['imdbId'],{'acquired':False})
+    for remoteData in mmdb_library:
+        remoteMedia = remoteData['media']
+        remoteTags = remoteData['tags']
+        if remoteData['type'] == 'movie':
+            if remoteMedia['imdbId'] is not None:
+                localMedia = xbmcApp.getLocalMovie(remoteMedia['imdbId'])
+                if localMedia is not None:
+                    debug('Media exists both locally and remotely - ('+remoteMedia['name']+')')
+                    if ACQUIRED not in remoteTags:
+                        debug('Setting remote media status to acquired ('+remoteMedia['name']+'['+localMedia['imdbId']+','+remoteMedia['id']+']).')
+                        mmdb.addRemoteMediaTag(remoteMedia['id'],ACQUIRED)
                         anyRemoteChanges = True
-                    else:
-                        debug('Acquired flag was not removed from mmdb due to settings!')
+                    if (WATCHED in remoteTags) != localMedia[WATCHED]:
+                        debug('watched status is not synchronized')
+                        if addon.getSetting('dontsyncwatched') == 'false':
+                            if WATCHED in remoteTags:
+                                debug('setting local media to watched')
+                                xbmcApp.setLocalFileAsWatched(localMedia['idFile'])
+                                anyLocalChanges = True
+                            else:
+                                debug ('setting remote media to watched ('+remoteMedia['name']+'['+localMedia['imdbId']+','+remoteMedia['id']+']).')
+                                mmdb.addRemoteMediaTag(remoteMedia['id'],WATCHED)
+                                anyRemoteChanges = True
+                        else:
+                            debug('Cancelled synchronize of watched status due to settings!')
+                else:
+                    debug('Media ('+remoteMedia['name']+') exists only remotely')
+                    if ACQUIRED in remoteTags:
+                        if(addon.getSetting('dontdeleteacquired') == 'false'):
+                            debug('Acquired flag was removed from mmdb ('+remoteMedia['name']+'['+remoteMedia['imdbId']+']).')
+                            mmdb.removeRemoteMediaTag(remoteMedia['id'],ACQUIRED)
+                            anyRemoteChanges = True
+                        else:
+                            debug('Acquired flag was not removed from mmdb due to settings!')
+
+        elif remoteData['type'] == 'episode':
+            if remoteMedia['ttdbId'] is not None:
+                localMedia = xbmcApp.getLocalEpisode(remoteMedia['ttdbId'],remoteMedia['season'],remoteMedia['episodeNumber'])
+                if localMedia is not None:
+                    debug('Media exists both locally and remotely - ('+remoteMedia['name']+')')
+                    if ACQUIRED not in remoteTags:
+                        debug('Setting remote media status to acquired ('+remoteMedia['name']+'['+localMedia['ttdbId']+','+remoteMedia['id']+']).')
+                        mmdb.addRemoteMediaTag(remoteMedia['id'],ACQUIRED)
+                        anyRemoteChanges = True
+                    if (WATCHED in remoteTags) != localMedia[WATCHED]:
+                        debug('watched status is not synchronized')
+                        if addon.getSetting('dontsyncwatched') == 'false':
+                            if WATCHED in remoteTags:
+                                debug('setting local media to watched')
+                                xbmcApp.setLocalFileAsWatched(localMedia['idFile'])
+                                anyLocalChanges = True
+                            else:
+                                debug ('setting remote media to watched ('+remoteMedia['name']+'['+localMedia['ttdbId']+','+remoteMedia['id']+']).')
+                                mmdb.addRemoteMediaTag(remoteMedia['id'],WATCHED)
+                                anyRemoteChanges = True
+                        else:
+                            debug('Cancelled synchronize of watched status due to settings!')
+                else:
+                    debug('Media ('+remoteMedia['name']+') exists only remotely')
+                    if ACQUIRED in remoteTags:
+                        if(addon.getSetting('dontdeleteacquired') == 'false'):
+                            debug('Acquired flag was removed from mmdb ('+remoteMedia['name']+'['+remoteMedia['id']+']).')
+                            mmdb.removeRemoteMediaTag(remoteMedia['id'],ACQUIRED)
+                            anyRemoteChanges = True
+                        else:
+                            debug('Acquired flag was not removed from mmdb due to settings!')
         else:
-            #MISSING IMDBID in REMOTE MOVIE
-            debug('('+remoteMedia['name']+') was missing imdbID, please add it at TMDB.org')
-      
+            raise RuntimeError('type matched nothing?')
+
     #sync local media with remote db
-    for localMedia in xbmcApp.getLocalMovieLibrary():
-        if(remoteMovieExists(localMedia['imdbId'])):
-            continue
-        debug('Media exists only locally - ('+localMedia['name']+')')
-        if(_setRemoteMovieTag(localMedia['imdbId'],{'acquired': True, 'experienced':localMedia['watched'] == 1})):
-            anyRemoteChanges = True  #if it _setRemoteMovieTag fails doesnt set: anyRemoteChanges
+    localLibrary = []
+    localLibrary.extend(xbmcApp.getLocalEpisodeLibrary())
+    localLibrary.extend(xbmcApp.getLocalMovieLibrary())
+
+    for localMedia in localLibrary:
+        if 'seriesName' in localMedia:
+            #is series/episode
+            debug('Episode exists only locally - ('+localMedia['seriesName']+' - ['+localMedia['season']+'x'+localMedia['episode']+'] '+' - '+localMedia['name']+')')
+            # TODO should cache the mmdb id <-> imdb id connection found in this search to prevent uneccesary load on
+            # mymediadb.org
+            result = mmdb.search(localMedia['ttdbId'])
+            if 'series' in result and len(result['series']) >= 1:
+                #Might be several results, however picking the first should suffice.
+                seriesId = result['series'][0]['id']
+                episodes = mmdb.getRemoteSeriesEpisodes(seriesId)
+                for episode in episodes:
+                    if str(episode['season']) == str(localMedia['season']) and str(episode['episodeNumber']) == str(localMedia['episode']):
+                        mmdbId = episode['id']
+                        mmdb.addRemoteMediaTag(mmdbId,ACQUIRED)
+                        if localMedia[WATCHED] == 1:
+                            mmdb.addRemoteMediaTag(mmdbId,WATCHED)
+                        break
+        else:
+            #is movie
+            if remoteMovieExists(localMedia['imdbId']):
+                continue
+            debug('Movie exists only locally - ('+localMedia['name']+')')
+            # TODO should cache the mmdb id <-> imdb id connection found in this search to prevent uneccesary load on
+            # mymediadb.org
+            result = mmdb.search(localMedia['imdbId'])
+            if 'movie' in result and len(result['movie']) >= 1:
+                #Might be several results, however picking the first should suffice.
+                mmdbId = result['movie'][0]['id']
+                mmdb.addRemoteMediaTag(mmdbId,ACQUIRED)
+                if localMedia[WATCHED] == 1:
+                    mmdb.addRemoteMediaTag(mmdbId,WATCHED)
+                anyRemoteChanges = True
+
     
     
     movieUpdatedNotifications()     
-    if(anyRemoteChanges):
+    if anyRemoteChanges:
         debug('--- MADE REMOTE UPDATE(S) ---')
-        mmdb_library = mmdb.getRemoteMovieLibrary() #sync local copy with changes on remote
-    elif(anyLocalChanges):
+        getRemoteLibrary()
+    elif anyLocalChanges:
         debug('--- MADE LOCAL CHANGE(S)  ---')
     else:
         debug('--- NO CHANGES DETECTED ---')
-    
-
-# Constants
-mmdb = MMDB(addon.getSetting('username'),addon.getSetting('password'))
-xbmcApp = XBMCApp(xbmc.translatePath('special://database/%s' % addon.getSetting('database')))
-
-# Globals
-mmdb_library = []
-recentlyFailedMovies = []
-updatedMovies = []
-# autoexecute addon on startup for older xbmc versions, remove this when xbmc.service goes live
-# Auto exec info
-AUTOEXEC_PATH = xbmc.translatePath( 'special://home/userdata/autoexec.py' )
-AUTOEXEC_FOLDER_PATH = xbmc.translatePath( 'special://home/userdata/' )
-AUTOEXEC_SCRIPT = '\nimport time;time.sleep(5);xbmc.executebuiltin("XBMC.RunScript(special://home/addons/%s/default.py)")\n' % addon.getAddonInfo('id')
-# See if the autoexec.py file exists
-if (os.path.exists(AUTOEXEC_PATH)):
-    debug('Found autoexec')
-    
-    # Var to check if we're in autoexec.py
-    found = False
-    autostart = addon.getSetting('autostart') == 'true'
-    autoexecfile = file(AUTOEXEC_PATH, 'r')
-    filecontents = autoexecfile.readlines()
-    autoexecfile.close()
-    
-    # Check if we're in it
-    for line in filecontents:
-        if line.find(addon.getAddonInfo('id')) > 0:
-            debug('Found ourselves in autoexec')
-            found = True
-    
-    # If the autoexec.py file is found and we're not in it,
-    if (not found and autostart):
-        debug('Adding ourselves to autoexec.py')
-        autoexecfile = file(AUTOEXEC_PATH, 'w')
-        filecontents.append(AUTOEXEC_SCRIPT)
-        autoexecfile.writelines(filecontents)            
-        autoexecfile.close()
-    
-    # Found that we're in it and it's time to remove ourselves
-    if (found and not autostart):
-        debug('Removing ourselves from autoexec.py')
-        autoexecfile = file(AUTOEXEC_PATH, 'w')
-        for line in filecontents:
-            if not line.find(addon.getAddonInfo('id')) > 0:
-                autoexecfile.write(line)
-        autoexecfile.close()
-
-else:
-    debug('autoexec.py doesnt exist')
-    if (os.path.exists(AUTOEXEC_FOLDER_PATH)):
-        debug('Creating autoexec.py with our autostart script')
-        autoexecfile = file(AUTOEXEC_PATH, 'w')
-        autoexecfile.write (AUTOEXEC_SCRIPT.strip())
-        autoexecfile.close()
-    else:
-        debug('Scripts folder missing, creating autoexec.py in that new folder with our script')
-        os.makedirs(AUTOEXEC_FOLDER_PATH)
-        autoexecfile = file(AUTOEXEC_PATH, 'w')
-        autoexecfile.write (AUTOEXEC_SCRIPT.strip())
-        autoexecfile.close()
 
 
+#Main method
 try:
+    # Initial validation / first time run?
+    if len(addon.getSetting('username')) == 0:
+        raise RuntimeWarning('Addon not configured yet! please add your user-details.')
+
+    # Constants
+    mmdb = MMDB(addon.getSetting('username'),addon.getSetting('password'))
+    xbmcApp = XBMCApp(xbmc.translatePath('special://database/%s' % addon.getSetting('database')))
+
+    # Globals
+    mmdb_library = []
+    recentlyFailedMedia = []
+    updatedMovies = []
+
     # Print addon information
     print "[ADDON] '%s: version %s' initialized!" % (addon.getAddonInfo('name'), addon.getAddonInfo('version'))
     if(addon.getSetting('shownotifications') == 'true'):
@@ -182,26 +187,28 @@ try:
     
     # Main logic
     debug('initial import of mmdb library')
-    mmdb_library = mmdb.getRemoteMovieLibrary() #initial fetch    
+    getRemoteLibrary() #initial fetch
             
     syncWithMmdbRunsCounter= 0
     
-    while (not xbmc.abortRequested):
+    while not xbmc.abortRequested:
         debug('Syncing local library with mmdb')
         syncWithMMDB()       
         sleeper(300000) #5minutes
         syncWithMmdbRunsCounter += 1
-        if(syncWithMmdbRunsCounter == 12): #60minutes
-            del recentlyFailedMovies[:]   # Will clear the failedmovies list, since we now got a newer remote medialibrary
-            mmdb_library = mmdb.getRemoteMovieLibrary()
+        if syncWithMmdbRunsCounter % 12 == 0: #60minutes
+            del recentlyFailedMedia[:]   # Will clear the failedmovies list, since we now got a newer remote medialibrary
+            getRemoteLibrary()
             debug('Scheduled import of mmdb library')
-            GRLCounter = 0
-            
-except urllib2.URLError, e:
-    if(e.code == 401):
-        xbmc.executebuiltin('Notification(%s,%s,%s,%s)' % (addon.getAddonInfo('name'),e,3000,addon.getAddonInfo("icon")))
-except Exception, e:
-        xbmc.executebuiltin('Notification(%s,%s,%s,%s)' % (addon.getAddonInfo('name'),'Error: %s' %e,5000,addon.getAddonInfo("icon")))
-        debug(e)
-        sleeper(5000)
-        sys.exit(1)
+
+except RuntimeWarning as e:
+    xbmc.executebuiltin('Notification(%s,%s,%s,%s)' % (addon.getAddonInfo('name'),'%s' % e,5000,addon.getAddonInfo("icon")))
+    debug(e)
+    sleeper(5000)
+    sys.exit(1)
+
+except Exception as e:
+    xbmc.executebuiltin('Notification(%s,%s,%s,%s)' % (addon.getAddonInfo('name'),'Error: %s' % e,5000,addon.getAddonInfo("icon")))
+    debug(e)
+    sleeper(5000)
+    raise
