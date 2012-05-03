@@ -10,7 +10,7 @@
 	<setting id="dontsyncwatched" type="bool" label="Do not synchronise watched status" default="false" />
   </category>
   <category label="Advanced (Only change if you know what you are doing)">
-  	<setting id="database" type="text" label="Video Database file" default="MyVideos34.db"/>
+  	<setting id="database" type="text" label="Video Database file" default="MyVideos60.db"/>
     <setting id="debug" type="bool" label="Debug" default="false" />
     <setting id="testmode" type="bool" label="Testmode" default="false" />
   </category>
